@@ -1,0 +1,11 @@
+awswrangler
+boto3
+environment-kernels
+fastparquet
+jupyter
+keras
+numpy
+pandas
+plotly
+seaborn
+scikit-learn
