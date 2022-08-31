@@ -8,19 +8,17 @@ forecasting financial time series?
 1. Financial time series are highly random. A nonexhaustive list of reasons
 why creating a unified price forecasting model is extremely difficult:
 
-Issues:
-
-    - Leptokurtic characteristic of price changes.
-    - Apparent nonstationarity and unstable sample variances over time.
-    - Discontinuities in prices e.g. jump discontinuities at market open or close
+**Issues:**
+- Leptokurtic characteristic of price changes.
+- Apparent nonstationarity and unstable sample variances over time.
+- Discontinuities in prices e.g. jump discontinuities at market open or close
     
-Solutions:
-
-    - Fractional price changes. Price changes are random while fractional price
-        changes can exhibit serial dependence.
-    - Use of "trading time". Although price changes are highly leptokurtic, price
-        changes over transaction or volume based time can be nearly gaussian over 
-        longer periods.
+**Solutions:**
+- Fractional price changes. Price changes are random while fractional price
+changes can exhibit serial dependence.
+- Use of "trading time". Although price changes are highly leptokurtic, price
+changes over transaction or volume based time can be nearly gaussian over 
+longer periods.
 
 2. Price forecasting doesn't align well with the objective of a trader. As a trader, 
 I don't care if the price in the next `n` minutes is going up, down, or sideways. 
