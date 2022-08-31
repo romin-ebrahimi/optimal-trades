@@ -9,14 +9,14 @@ forecasting financial time series?
 why creating a unified price forecasting model is extremely difficult:
 
 **Issues:**
-- Leptokurtic characteristic of price changes.
-- Apparent nonstationarity and unstable sample variances over time.
-- Discontinuities in prices e.g. jump discontinuities at market open or close
+* Leptokurtic characteristic of price changes.
+* Apparent nonstationarity and unstable sample variances over time.
+* Discontinuities in prices e.g. jump discontinuities at market open or close
     
 **Solutions:**
-- Fractional price changes. Price changes are random while fractional price
+* Fractional price changes. Price changes are random while fractional price
 changes can exhibit serial dependence.
-- Use of "trading time". Although price changes are highly leptokurtic, price
+* Use of "trading time". Although price changes are highly leptokurtic, price
 changes over transaction or volume based time can be nearly gaussian over 
 longer periods.
 
