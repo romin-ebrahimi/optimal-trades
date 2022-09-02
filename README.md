@@ -31,9 +31,9 @@ optimizing trading systems.
 
 ### Concept
 **Given:**
-* $X$ input matrix of covariates
-* $y$ target labels where $y \in \{short, long, closed\}
-* $F$ TODO: check literature for representation of classification network mapping y|X
+$X$ input matrix of covariates
+$y$ target labels where $y \in \{short, long, closed\}$
+$F$ TODO: check literature for representation of classification network mapping y|X
 
 Assume we have some matrix $X$ of covariates that contain predictive information.
 The goal is to create a model that exploits this information to systematically
