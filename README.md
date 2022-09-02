@@ -5,8 +5,13 @@ Much of the literature on systematic trading focuses on testing different
 models that are used to financial price forecasting. What's wrong with 
 forecasting financial time series?
 
-1. Financial time series are highly random. A nonexhaustive list of reasons
-why creating a unified price forecasting model is extremely difficult:
+1. Price forecasting doesn't align well with the objective of a trader. As a trader, 
+I don't care if the price in the next `n` minutes is going up, down, or sideways. 
+What I am truly interested in at any point in time is whether I should be long, 
+short, or close out any open positions.
+
+2. Financial time series are highly random. A nonexhaustive list of issues
+in creating a unified price forecasting model:
 
 **Issues:**
 * Leptokurtic characteristic of price changes.
@@ -20,20 +25,28 @@ changes can exhibit serial dependence.
 changes over transaction or volume based time can be nearly gaussian over 
 longer periods.
 
-2. Price forecasting doesn't align well with the objective of a trader. As a trader, 
-I don't care if the price in the next `n` minutes is going up, down, or sideways. 
-What I am truly interested in at any point in time is whether I should be long, 
-short, or close out any open positions. 
-
 The goal of this project is to create a modeling framework that aligns with the 
-objective of a trader. This methodology and the included code can be used for 
+objective of a trader. The included methodology and code can be used for 
 optimizing trading systems.
 
 ### Concept
-- Math and thinking of how to optimize trades. Demonstrate relationship between 
-predictive inputs, optimal trades, and the model trying to capture the conditional 
-relationship.
-- If volume time is used, then volume could be a proxy for risk exposure, maximizing 
+**Given:**
+* $X$ input matrix of covariates
+* $y$ target labels where $y \in \{short, long, closed\}
+* $F$ TODO: check literature for representation of classification network mapping y|X
+
+Assume we have some matrix $X$ of covariates that contain predictive information.
+The goal is to create a model that exploits this information to systematically
+place trades. Trading can be described using a three class sample space directly 
+mapping to the three trading states: short, long, and closed. The labels $y$ 
+representing these three states can be generated from fixed duration returns, 
+which have no guarantee of optimality, or directly optimizing the labels as part 
+of the modeling process. Optimizing the model and target labels while conditioning 
+on the inputs 
+
+
+
+TODO: If volume time is used, then volume could be a proxy for risk exposure, maximizing 
 risk adjusted returns is difficult. Taking the log makes the two components additive 
 with a parameter for risk aversion.
 
