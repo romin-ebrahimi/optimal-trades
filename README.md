@@ -30,25 +30,33 @@ objective of a trader. The included methodology and code can be used for
 optimizing trading systems.
 
 ### Concept
-**Given:**
-$X$ input matrix of covariates
-$y$ target labels where $y \in \{short, long, closed\}$
-$F$ TODO: check literature for representation of classification network mapping y|X
+
+$X$ = input matrix of covariates <br>
+$y$ = target labels where $y \in \{0,1,2\} <br>
+$f$ = model approximating $P(y|X)$ <br>
 
 Assume we have some matrix $X$ of covariates that contain predictive information.
 The goal is to create a model that exploits this information to systematically
 place trades. Trading can be described using a three class sample space directly 
-mapping to the three trading states: short, long, and closed. The labels $y$ 
-representing these three states can be generated from fixed duration returns, 
+mapping to the three trading states of "short", "long", and "closed". The labels 
+$y$ representing these three states can be generated from fixed duration returns, 
 which have no guarantee of optimality, or directly optimizing the labels as part 
 of the modeling process. Optimizing the model and target labels while conditioning 
-on the inputs 
+on the inputs can be done using a nontrivial version of Kadane's algorithm that 
+accounts for trade frictions and "risk". Trade frictions consist of expected 
+transaction costs and slippage.
 
+Given some risk constraint $k$ and expected trading frictions, the algorithm 
+maximizes risk adjusted returns. The optimal solution for $y$ given by $y_k$ can 
+change depending on this chosen risk constraint. For each solution $y_k$, a model 
+$f$ can be fitted to approximate the probabilistic relationship between $X$ and 
+$y_k$. Then the estimated probabilies $P(y_k|X)$ can be used to evaluate the 
+expected performance using time series cross validation.
 
 
 TODO: If volume time is used, then volume could be a proxy for risk exposure, maximizing 
 risk adjusted returns is difficult. Taking the log makes the two components additive 
-with a parameter for risk aversion.
+with a parameter for risk aversion. What is the risk constraint?
 
 ### Algorithm
 Actual algorithm for solving this is a slightly more involved version of Kadane's 
