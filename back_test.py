@@ -169,7 +169,7 @@ def _get_drawdown(df_bt: pd.DataFrame) -> tuple:
     
     n_days = (df_bt.at[idx_1,'time'] - df_bt.at[idx_0,'time']).days
     
-    return (dd_max, n_days)
+    return (round(dd_max, 3), n_days)
 
 def trade_stats(df: pd.DataFrame,
                 decimal_pip: int = 5,
@@ -326,7 +326,7 @@ def target_optimal(df_price: pd.DataFrame,
             max_price = (df_price[i] / (10**-(decimal_pip-1))) # higher max_price
         elif max_price - ((df_price[i] / (10**-(decimal_pip-1)))) > dd_bps: # max drawdown constraint
             if idx_buy != idx_max:
-                opt[idx_buy:(idx_max + 1)] = 1 # close long trade
+                opt[idx_buy:(idx_max+1)] = 1 # close long trade
                 
             idx_buy = i # reset trade open
             idx_max = i # reset max price
@@ -347,16 +347,16 @@ def target_optimal(df_price: pd.DataFrame,
         elif min_price > (df_price[i] / (10**-(decimal_pip-1))):
             idx_min = i # reset min price
             min_price = (df_price[i] / (10**-(decimal_pip-1))) # lower min_price
-        elif max_price - ((df_price[i] / (10**-(decimal_pip-1)))) > dd_bps: # max drawdown constraint
+        elif min_price - ((df_price[i] / (10**-(decimal_pip-1)))) < -dd_bps: # max drawdown constraint
             if idx_sell != idx_min:
-                opt[idx_sell:(idx_min + 1)] = -1 # close short trade
+                opt[idx_sell:(idx_min+1)] = -1 # close short trade
             
             idx_sell = i # reset trade open
             idx_min = i # reset min price
             sell_price = (df_price[i] / (10**-(decimal_pip-1))) - fee_bps
             min_price = sell_price
     
-    opt.loc[opt == 0] = 2 # map close
+    opt.loc[opt == 0] = 2 # close
     opt.loc[opt < 0] = 0 # short
     
     return opt
