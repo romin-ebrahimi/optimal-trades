@@ -3,7 +3,8 @@ import pandas as pd
 
 def back_test(df: pd.DataFrame,
               decimal_pip: int = 5,
-              threshold: float = 0.5) -> pd.DataFrame:
+              threshold: float = 0.5,
+              fee_bps: int = 0) -> pd.DataFrame:
     """
     Args: 
      df: A dataframe with timestamp, price, probability long,
@@ -23,9 +24,15 @@ def back_test(df: pd.DataFrame,
     df_out.loc[df.L > threshold,'signal'] = 1
     df_out.loc[df.S > threshold,'signal'] = -1
     df_out.at[df_out.index[-1],'signal'] = 0 # end of sample force close
-    df_out['trade_delta'] = round(df['close'].diff().shift(-1)*df_out['signal'], 
-                                  decimal_pip) # ignores market frictions
+    df_out['trade_delta'] = df['close'].diff().shift(-1)*df_out['signal']
     df_out = df_out.fillna(0) # last element is NaN
+    
+    ee = entry_exit(df, threshold = threshold)
+    idx_open_l = df[df.time.isin(ee[ee.open_close == 'open long'].time)].index.values.astype('int') 
+    idx_open_s = df[df.time.isin(ee[ee.open_close == 'open short'].time)].index.values.astype('int')
+    df_out.loc[idx_open_l,'trade_delta'] -= fee_bps*(10**-(decimal_pip-1))
+    df_out.loc[idx_open_s,'trade_delta'] -= fee_bps*(10**-(decimal_pip-1))
+    df_out['trade_delta'] = round(df_out.trade_delta, decimal_pip)
     
     return df_out
 
@@ -109,6 +116,7 @@ def plot_returns(df: pd.DataFrame,
 def _get_returns(df: pd.DataFrame,
                  threshold: float = 0.5,
                  decimal_pip: int = 5,
+                 fee_bps: int = 0,
                  is_long = True) -> list:
     "Given trades, calculates the return series in bps."
     rets = [] # list of return series
@@ -124,10 +132,11 @@ def _get_returns(df: pd.DataFrame,
         idx_close = df[df.time.isin(ee[ee.open_close == 'close short'].time)].index.values.astype('int')
     
     for i in range(len(idx_open)):
-        diff_series = df[idx_open[i]:(idx_close[i]+1)].close.diff().shift(-1)
-        diff_series = round(diff_series*direction, decimal_pip).dropna() # trade return series rounded
-       
-        rets.append((diff_series / (10**-(decimal_pip-1))) / 4) # scale diff series into bps
+        diff_series = df[idx_open[i]:(idx_close[i]+1)].close.diff().shift(-1) # return series
+        diff_series = round(diff_series*direction, decimal_pip).dropna().reset_index(drop = True)
+        diff_series /= (10**-(decimal_pip-1)) # scale into bps
+        diff_series[0] -= fee_bps # subtract fees for trading and slippage
+        rets.append(diff_series)
     
     return rets
 
@@ -207,16 +216,29 @@ def trade_stats(df: pd.DataFrame,
           12. max drawdown (bps)
           13. max drawdown duration in days
     """
-    stats = dict() # TODO: add trading friction from fee_bps
+    stats = dict() # return dictionary of stats
     
-    bt = back_test(df, 
+    bt = back_test(df,
                    decimal_pip = decimal_pip,
-                   threshold = threshold) # overall stats
-    total_return = bt.trade_delta.sum() # differences are pips and thus additive
-    
+                   threshold = threshold,
+                   fee_bps = fee_bps)
+    rets_l = _get_returns(df,
+                          threshold = threshold,
+                          decimal_pip = decimal_pip,
+                          fee_bps = fee_bps,
+                          is_long = True)
+    rets_s = _get_returns(df,
+                          threshold = threshold,
+                          decimal_pip = decimal_pip,
+                          fee_bps = fee_bps,
+                          is_long = False)
+    trades_l = len(rets_l)
+    trades_s = len(rets_s)
+    trades_total = trades_s + trades_l
+    total_return = bt.trade_delta.sum() # differences are pips, which are additive
     n_days = (df.at[(df.shape[0] - 1),'time'] - df.at[0,'time']).days # number of days in sample
     annual_return = total_return*(ANNUAL_TRADE_DAYS/n_days) # annualized return
-    std_scaler = (ANNUAL_TRADE_DAYS*(bt.shape[0]/n_days))**0.5 # annualize sdev
+    std_scaler = (ANNUAL_TRADE_DAYS*(bt.shape[0]/n_days))**0.5 # annualize std dev
     std_deviation = np.std(bt.trade_delta)*std_scaler # annualized std deviation
     downside_delta = bt.trade_delta.copy()
     downside_delta[downside_delta > 0] = 0
@@ -231,18 +253,6 @@ def trade_stats(df: pd.DataFrame,
         sortino = round(annual_return / std_downside, 2) # sortino ratio
     else:
         sortino = np.nan
-    
-    rets_l = _get_returns(df,
-                          threshold = threshold,
-                          decimal_pip = decimal_pip,
-                          is_long = True)
-    rets_s = _get_returns(df,
-                          threshold = threshold,
-                          decimal_pip = decimal_pip,
-                          is_long = False)
-    trades_l = len(rets_l)
-    trades_s = len(rets_s)
-    trades_total = trades_s + trades_l
     
     if trades_l > 0:
         avg_l = round(sum([sum(ret) for ret in rets_l]) / float(trades_l), 0) # 1 basis point minimum
