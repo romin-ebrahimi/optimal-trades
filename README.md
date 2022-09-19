@@ -2,12 +2,12 @@
 
 ### Background
 Much of the literature on systematic trading focuses on testing different 
-models that are used to financial price forecasting. What's wrong with 
+models that are used for financial price forecasting. What's wrong with 
 forecasting financial time series?
 
 1. Price forecasting doesn't align well with the objective of a trader. As a trader, 
-I a less interested in whether the price in the next `n` minutes is going up, down, 
-or sideways. What I am truly interested in at any point in time is whether I should 
+I'm less interested in whether the price over the next `n` minutes is going up, down, 
+or sideways. What I'm truly interested in at any point in time, is whether I should 
 be long, short, or close out any open positions.
 
 2. Financial time series are highly random. A nonexhaustive list of issues
@@ -54,15 +54,15 @@ a risk constraint $r_k$, a model $F_k$ can be fitted to approximate the
 conditional relationship between $X$ and $Y_k$. Then, the estimated probabilities 
 $P(Y_k|X)$ can be used to evaluate the expected performance using time series 
 cross validation. Among the candidate models $F_k(Y_k,X)$, there exists an optimal 
-joint model and target label $F^{\ast}(Y^{\ast},X)$ solution.
+joint model and target label solution $F^{\ast}(Y^{\ast},X)$.
 
 ### Code
 - **createEnv.sh** - bash script for creating virtual python environment.
-- **functions.py** - functions used for trade label optimization and testing.
+- **backtest.py** - class and methods used for trade label optimization and testing.
 - **main.ipynb** - python notebook demonstrating usage and methodology.
 
-Within the `functions.py` module, the method `target_optimal` contains the 
-algorithm for optimizing the labels. This can be used generate the different
-potential solutions given input target constraints. Then, the optimal model 
+Within the `backtest.py` module, the method `target_optimal` contains the 
+algorithm for optimizing trade labels. This can be used to generate different
+potential solutions given some input target constraints. Then, the optimal model 
 can be found using time series cross validation.
 
