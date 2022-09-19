@@ -48,13 +48,13 @@ slippage.
 
 Given some risk constraint $r_k$ and the expected trade frictions, the algorithm 
 maximizes returns. In this context, "risk" can be a measure of dispersion or 
-some approximation of tail risk. The optimal labels $Y^{*}$ can change depending 
+some approximation of tail risk. The optimal labels $Y^{\ast}$ can change depending 
 on this chosen risk constraint. For each possible solution $Y_k$ corresponding to 
 a risk constraint $r_k$, a model $F_k$ can be fitted to approximate the 
 conditional relationship between $X$ and $Y_k$. Then, the estimated probabilities 
 $P(Y_k|X)$ can be used to evaluate the expected performance using time series 
 cross validation. Among the candidate models $F_k(Y_k,X)$, there exists an optimal 
-joint model and target label $F^{*}(Y^{*},X)$ solution.
+joint model and target label $F^{\ast}(Y^{\ast},X)$ solution.
 
 ### Code
 - **createEnv.sh** - bash script for creating virtual python environment.
