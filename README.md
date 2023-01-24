@@ -1,28 +1,28 @@
 ## Optimization for Algorithmic Trading
 
 ### Background
-Much of the literature on systematic trading focuses on testing different 
+Much of the literature for systematic trading focuses on testing different 
 models that are used for financial price forecasting. What's wrong with 
 forecasting financial time series?
 
 1. Price forecasting doesn't align well with the objective of a trader. As a trader, 
-I'm less interested in whether the price over the next `n` minutes is going up, down, 
-or sideways. What I'm truly interested in at any point in time, is whether I should 
+I'm less interested in whether the price over the next `n` periods is going up, down, 
+or sideways. What I'm truly interested in at any point, is whether I should 
 be long, short, or close out any open positions.
 
 2. Financial time series are highly random. A nonexhaustive list of issues
-in creating a unified price forecasting model:
+associated with price forecasting financial series includes:
 
 **Issues:**
 * Leptokurtic characteristic of price changes.
-* Apparent nonstationarity and unstable sample variances over time.
+* Apparent nonstationarity or unstable sample variances across periods.
 * Discontinuities in prices e.g. jump discontinuities at market open or close
     
 **Solutions:**
 * Fractional price changes. Price changes are random while fractional price
 changes can exhibit serial dependence.
 * Use of "trading time". Although price changes are highly leptokurtic, price
-changes over transaction or volume based time can be nearly gaussian over 
+changes over transaction or volume based windows can be nearly gaussian over 
 longer periods.
 
 The goal of this project is to create a modeling framework that aligns with the 
