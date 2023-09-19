@@ -1,0 +1,31 @@
+tool.black]
+line-length = 80
+target-version = ['py310']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+| \.hg
+| \.mypy_cache
+| \.tox
+| \.venv
+| _build
+| buck-out
+| build
+)/
+'''
+
+[tool.flake8]
+max-line-length = 80
+extend-ignore = [
+"D203", 
+"E203", 
+"E251", 
+"E266", 
+"E302", 
+"E401", 
+"E402",  
+"W503"
+]
+exclude = [".git", "__pycache__", "dist"]
+
