@@ -1,143 +1,195 @@
 import numpy as np
 import pandas as pd
 
+
 class BackTest:
-    
-    def __init__(self,
-                 data: pd.DataFrame,
-                 decimal_pip: int = 5,
-                 threshold: float = 0.5,
-                 fee_bps: int = 0):
+    def __init__(
+        self,
+        data: pd.DataFrame,
+        decimal_pip: int = 5,
+        threshold: float = 0.5,
+        fee_bps: int = 0,
+    ):
         self._data = data
         self._decimal_pip = decimal_pip
         self._threshold = threshold
         self._fee_bps = fee_bps
         self._len = len(data)
-   
 
     def back_test(self) -> pd.DataFrame:
         """
-        Args: 
+        Args:
          data: A dataframe with timestamp, price, probability long,
-             probability short, and target signal column. 
+             probability short, and target signal column.
          decimal_pip: The decimal place representing 1/10 pip,
              which is used for scaling the price changes.
              e.g. EURUSD is 5 where 0.00001 is 1/10 pip.
          threshold: The probability threshold for trade entry.
          fee_bps: expected trading frictions per trade.
 
-        Returns: 
-            A pandas dataframe of the simulated trading 
-            entry/exit points and the expected trading returns 
+        Returns:
+            A pandas dataframe of the simulated trading
+            entry/exit points and the expected trading returns
             over time.
         """
-        _ol = 'open long'
-        _os = 'open short'
-        df_out = self._data[['time','close']].copy() # time, close price, signal, trade delta
-        df_out['signal'] = 0 # signal (S,L,C) maps to (-1,1,0)
-        df_out.loc[self._data.L > self._threshold,'signal'] = 1
-        df_out.loc[self._data.S > self._threshold,'signal'] = -1
-        df_out.at[df_out.index[-1],'signal'] = 0 # end of sample force close
-        df_out['trade_delta'] = self._data['close'].diff().shift(-1)*df_out['signal']
-        df_out = df_out.fillna(0) # last element is NaN
+        _ol = "open long"
+        _os = "open short"
+        # Columns are: time, close price, signal, trade delta.
+        df_out = self._data[["time", "close"]].copy()
+        # Column signal (S,L,C) maps to (-1,1,0).
+        df_out["signal"] = 0
+        df_out.loc[self._data.L > self._threshold, "signal"] = 1
+        df_out.loc[self._data.S > self._threshold, "signal"] = -1
+        # Force close positions at the end of the sample.
+        df_out.at[df_out.index[-1], "signal"] = 0
+        df_out["trade_delta"] = (
+            self._data["close"].diff().shift(-1) * df_out["signal"]
+        )
+        df_out = df_out.fillna(0)
 
         ee = self.entry_exit()
-        idx_open_l = self._data[self._data.time.isin(ee[ee.open_close == _ol].time)].index.values.astype('int') 
-        idx_open_s = self._data[self._data.time.isin(ee[ee.open_close == _os].time)].index.values.astype('int')
-        df_out.loc[idx_open_l,'trade_delta'] -= self._fee_bps*(10**-(self._decimal_pip-1))
-        df_out.loc[idx_open_s,'trade_delta'] -= self._fee_bps*(10**-(self._decimal_pip-1))
-        df_out['trade_delta'] = round(df_out.trade_delta, self._decimal_pip)
+        idx_open_l = self._data[
+            self._data.time.isin(ee[ee.open_close == _ol].time)
+        ].index.values.astype("int")
+
+        idx_open_s = self._data[
+            self._data.time.isin(ee[ee.open_close == _os].time)
+        ].index.values.astype("int")
+
+        df_out.loc[idx_open_l, "trade_delta"] -= self._fee_bps * (
+            10 ** -(self._decimal_pip - 1)
+        )
+        df_out.loc[idx_open_s, "trade_delta"] -= self._fee_bps * (
+            10 ** -(self._decimal_pip - 1)
+        )
+        df_out["trade_delta"] = round(df_out.trade_delta, self._decimal_pip)
 
         return df_out
 
-    
     def entry_exit(self) -> pd.DataFrame:
         """
-        Given input data, return a dataframe where each row is 
+        Given input data, return a dataframe where each row is
         a trade entry or exit time stamp and position.
         """
-        df_out = pd.DataFrame(columns = ['time','close','trade','open_close'])
-        _close = 'close'
-        _open_long = 'open long'
-        _open_short = 'open short'
+        df_out = pd.DataFrame(columns=["time", "close", "trade", "open_close"])
+        _close = "close"
+        _open_long = "open long"
+        _open_short = "open short"
         state = _close
-        
+
         for i in range(self._len):
-            if self._data.at[i,'L'] <= self._threshold and state == _open_long: # close long position
-                temp = pd.DataFrame(self._data.loc[i,['time','close']].copy()).T
-                temp['trade'] = 'sell'
-                temp['open_close'] = 'close long'
+            if (
+                self._data.at[i, "L"] <= self._threshold and state == _open_long
+            ):  # close long position
+                temp = pd.DataFrame(
+                    self._data.loc[i, ["time", "close"]].copy()
+                ).T
+                temp["trade"] = "sell"
+                temp["open_close"] = "close long"
                 df_out = pd.concat([df_out, temp])
                 state = _close
-            elif self._data.at[i,'S'] <= self._threshold and state == _open_short: # close short position
-                temp = pd.DataFrame(self._data.loc[i,['time','close']].copy()).T
-                temp['trade'] = 'buy'
-                temp['open_close'] = 'close short'
+            elif (
+                self._data.at[i, "S"] <= self._threshold
+                and state == _open_short
+            ):  # close short position
+                temp = pd.DataFrame(
+                    self._data.loc[i, ["time", "close"]].copy()
+                ).T
+                temp["trade"] = "buy"
+                temp["open_close"] = "close short"
                 df_out = pd.concat([df_out, temp])
                 state = _close
 
-            if self._data.at[i,'L'] > self._threshold and state == _close: # open long position
-                temp = pd.DataFrame(self._data.loc[i,['time','close']].copy()).T
-                temp['trade'] = 'buy'
-                temp['open_close'] = 'open long'
+            if (
+                self._data.at[i, "L"] > self._threshold and state == _close
+            ):  # open long position
+                temp = pd.DataFrame(
+                    self._data.loc[i, ["time", "close"]].copy()
+                ).T
+                temp["trade"] = "buy"
+                temp["open_close"] = "open long"
                 df_out = pd.concat([df_out, temp])
                 state = _open_long
-            elif self._data.at[i,'S'] > self._threshold and state == _close: # open short position
-                temp = pd.DataFrame(self._data.loc[i,['time','close']].copy()).T
-                temp['trade'] = 'sell'
-                temp['open_close'] = 'open short'
+            elif (
+                self._data.at[i, "S"] > self._threshold and state == _close
+            ):  # open short position
+                temp = pd.DataFrame(
+                    self._data.loc[i, ["time", "close"]].copy()
+                ).T
+                temp["trade"] = "sell"
+                temp["open_close"] = "open short"
                 df_out = pd.concat([df_out, temp])
                 state = _open_short
 
         if state == _open_long:
-            temp = pd.DataFrame(self._data.loc[(self._len-1),['time','close']].copy()).T
-            temp['trade'] = 'sell'
-            temp['open_close'] = 'close long'
+            temp = pd.DataFrame(
+                self._data.loc[(self._len - 1), ["time", "close"]].copy()
+            ).T
+            temp["trade"] = "sell"
+            temp["open_close"] = "close long"
             df_out = pd.concat([df_out, temp])
             state = _close
         elif state == _open_short:
-            temp = pd.DataFrame(self._data.loc[(self._len-1),['time','close']].copy()).T
-            temp['trade'] = 'buy'
-            temp['open_close'] = 'close short'
+            temp = pd.DataFrame(
+                self._data.loc[(self._len - 1), ["time", "close"]].copy()
+            ).T
+            temp["trade"] = "buy"
+            temp["open_close"] = "close short"
             df_out = pd.concat([df_out, temp])
             state = _close
 
-        assert state == _close # no positions left open
+        assert state == _close  # no positions left open
 
         return df_out
 
-    
-    def _get_returns(self,
-                     is_long = True) -> list[list]:
+    def _get_returns(self, is_long=True) -> list[list]:
         "Given trades, calculate the return series in bps."
-        rets = [] # return series of trades
+        rets = []
         ee = self.entry_exit()
-        _ol = 'open long'
-        _cl = 'close long'
-        _os = 'open short'
-        _cs = 'close short'
+        _ol = "open long"
+        _cl = "close long"
+        _os = "open short"
+        _cs = "close short"
 
         if is_long:
             direction = 1.0
-            idx_open = self._data[self._data.time.isin(ee[ee.open_close == _ol].time)].index.values.astype('int') 
-            idx_close = self._data[self._data.time.isin(ee[ee.open_close == _cl].time)].index.values.astype('int')
+            idx_open = self._data[
+                self._data.time.isin(ee[ee.open_close == _ol].time)
+            ].index.values.astype("int")
+
+            idx_close = self._data[
+                self._data.time.isin(ee[ee.open_close == _cl].time)
+            ].index.values.astype("int")
         else:
             direction = -1.0
-            idx_open = self._data[self._data.time.isin(ee[ee.open_close == _os].time)].index.values.astype('int')
-            idx_close = self._data[self._data.time.isin(ee[ee.open_close == _cs].time)].index.values.astype('int')
+            idx_open = self._data[
+                self._data.time.isin(ee[ee.open_close == _os].time)
+            ].index.values.astype("int")
+
+            idx_close = self._data[
+                self._data.time.isin(ee[ee.open_close == _cs].time)
+            ].index.values.astype("int")
 
         for i in range(len(idx_open)):
-            diff_series = self._data[idx_open[i]:(idx_close[i]+1)].close.diff().shift(-1)
-            diff_series = round(diff_series*direction, self._decimal_pip).dropna().reset_index(drop = True)
-            diff_series /= (10**-(self._decimal_pip-1)) # scale changes into bps
-            diff_series[0] -= self._fee_bps 
+            diff_series = (
+                self._data[idx_open[i] : (idx_close[i] + 1)]
+                .close.diff()
+                .shift(-1)
+            )
+            diff_series = (
+                round(diff_series * direction, self._decimal_pip)
+                .dropna()
+                .reset_index(drop=True)
+            )
+            diff_series /= 10 ** -(
+                self._decimal_pip - 1
+            )  # Scale changes into bps.
+            diff_series[0] -= self._fee_bps
             rets.append(diff_series.tolist())
 
         return rets
 
-    
-    def _get_accuracy(self,
-                      rets: list) -> float:
+    def _get_accuracy(self, rets: list) -> float:
         "Given trade returns, calculate trade accuracy."
         rets_sum = [sum(r) for r in rets]
         hits = sum([r > 0 for r in rets_sum])
@@ -149,37 +201,35 @@ class BackTest:
 
         return acc
 
-    
-    def _get_drawdown(self,
-                      df_bt: pd.DataFrame) -> tuple[float, float]:
+    def _get_drawdown(self, df_bt: pd.DataFrame) -> tuple[float, float]:
         """
-        Given full backtest trade deltas, calculate worst 
-        drawdown percentage and the duration of the worst 
+        Given full backtest trade deltas, calculate worst
+        drawdown percentage and the duration of the worst
         drawdown in days.
         """
-        c_sum = list(df_bt.trade_delta.cumsum()) # cumulative sum of returns
-        c_max = list(df_bt.trade_delta.cumsum().cummax()) # running max of c_sum
-        dds = [None]*len(c_sum) # list of drawdowns over time
+        c_sum = list(df_bt.trade_delta.cumsum())  # cumulative sum of returns
+        c_max = list(
+            df_bt.trade_delta.cumsum().cummax()
+        )  # running max of c_sum
+        dds = [None] * len(c_sum)  # list of drawdowns over time
         for i in range(len(dds)):
-            dds[i] = c_sum[i] - c_max[i] # drawdown
+            dds[i] = c_sum[i] - c_max[i]  # drawdown
 
         dd_max = min(dds)
 
-        idx_1 = dds.index(dd_max) # end index of max drawdown
-        idx_0 = c_max.index(c_max[idx_1]) # start index of max drawdown
+        idx_1 = dds.index(dd_max)  # end index of max drawdown
+        idx_0 = c_max.index(c_max[idx_1])  # start index of max drawdown
 
-        n_days = (df_bt.at[idx_1,'time'] - df_bt.at[idx_0,'time']).days
+        n_days = (df_bt.at[idx_1, "time"] - df_bt.at[idx_0, "time"]).days
 
         return (round(dd_max, 3), n_days)
 
-    
-    def trade_stats(self,
-                    annual_trade_days: float = 260) -> dict:
+    def trade_stats(self, annual_trade_days: float = 260) -> dict:
         """
         Calculate the trading statistics from output probabilities.
 
         Args:
-            df: Dataframe containing price data and output probabilties 
+            df: Dataframe containing price data and output probabilties
                 from a trading model for long and short.
             decimal_pip: The decimal place representing 1/10 pip,
                 which is used for scaling the price changes.
@@ -194,7 +244,7 @@ class BackTest:
           A dictionary containing:
               1. E[annual return]
               2. downside standard deviation
-              3. standard deviation 
+              3. standard deviation
               4. total sample return
               5. average return of long trades (bps)
               6. average return of short trades (bps)
@@ -206,81 +256,93 @@ class BackTest:
               12. max drawdown (bps)
               13. max drawdown duration in days
         """
-        stats = dict() # return dictionary of stats
+        stats = dict()  # return dictionary of stats
 
         bt = self.back_test()
-        rets_l = self._get_returns(is_long = True)
-        rets_s = self._get_returns(is_long = False)
+        rets_l = self._get_returns(is_long=True)
+        rets_s = self._get_returns(is_long=False)
         trades_l = len(rets_l)
         trades_s = len(rets_s)
         trades_total = trades_s + trades_l
-        total_return = bt.trade_delta.sum() # differences are pips, which are additive
-        n_days = (self._data.at[(self._len - 1),'time'] - self._data.at[0,'time']).days
-        annual_return = total_return*(annual_trade_days/n_days)
-        std_scaler = (annual_trade_days*(len(bt)/n_days))**0.5
-        annual_sdev = np.std(bt.trade_delta)*std_scaler
+        total_return = (
+            bt.trade_delta.sum()
+        )  # differences are pips, which are additive
+        n_days = (
+            self._data.at[(self._len - 1), "time"] - self._data.at[0, "time"]
+        ).days
+        annual_return = total_return * (annual_trade_days / n_days)
+        std_scaler = (annual_trade_days * (len(bt) / n_days)) ** 0.5
+        annual_sdev = np.std(bt.trade_delta) * std_scaler
         downside_delta = bt.trade_delta.copy()
         downside_delta[downside_delta > 0] = 0
-        annual_downside_sdev = np.std(downside_delta)*std_scaler
+        annual_downside_sdev = np.std(downside_delta) * std_scaler
 
         if annual_sdev > 0:
-            sharpe = round(annual_return / annual_sdev, 2) # sharpe ratio
+            sharpe = round(annual_return / annual_sdev, 2)
         else:
             sharpe = np.nan
 
         if annual_downside_sdev > 0:
-            sortino = round(annual_return / annual_downside_sdev, 2) # sortino ratio
+            sortino = round(annual_return / annual_downside_sdev, 2)
         else:
             sortino = np.nan
 
         if trades_l > 0:
-            avg_l = round(sum([sum(ret) for ret in rets_l]) / float(trades_l), 0) # 1 basis point minimum
+            # Rounding is done to ensure 1 bps discrete minimum. This
+            # ignores fractional bps as noise.
+            avg_l = round(
+                sum([sum(ret) for ret in rets_l]) / float(trades_l), 0
+            )
         else:
             avg_l = np.nan
 
         if trades_s > 0:
-            avg_s = round(sum([sum(ret) for ret in rets_s]) / float(trades_s), 0)
+            avg_s = round(
+                sum([sum(ret) for ret in rets_s]) / float(trades_s), 0
+            )
         else:
             avg_s = np.nan
 
-        acc_long = self._get_accuracy(rets = rets_l)
-        acc_short = self._get_accuracy(rets = rets_s)
-        acc_total = self._get_accuracy(rets = rets_l + rets_s)
+        acc_long = self._get_accuracy(rets=rets_l)
+        acc_short = self._get_accuracy(rets=rets_s)
+        acc_total = self._get_accuracy(rets=rets_l + rets_s)
 
-        dd = self._get_drawdown(df_bt = bt)
+        dd = self._get_drawdown(df_bt=bt)
 
-        stats['annual_return'] = round(annual_return, 3)
-        stats['sharpe'] = sharpe
-        stats['sortino'] = sortino
-        stats['std_deviation'] = round(annual_sdev, 3)
-        stats['total_return'] = round(total_return, 4)
-        stats['trade_count_long'] = trades_l
-        stats['trade_count_short'] = trades_s
-        stats['trade_count_total'] = trades_total
-        stats['average_return_long'] = avg_l
-        stats['average_return_short'] = avg_s
-        stats['accuracy_long'] = acc_long
-        stats['accuracy_short'] = acc_short
-        stats['accuracy_total'] = acc_total
-        stats['max_drawdown'] = dd[0]
-        stats['max_drawdown_days'] = dd[1]
+        stats["annual_return"] = round(annual_return, 3)
+        stats["sharpe"] = sharpe
+        stats["sortino"] = sortino
+        stats["std_deviation"] = round(annual_sdev, 3)
+        stats["total_return"] = round(total_return, 4)
+        stats["trade_count_long"] = trades_l
+        stats["trade_count_short"] = trades_s
+        stats["trade_count_total"] = trades_total
+        stats["average_return_long"] = avg_l
+        stats["average_return_short"] = avg_s
+        stats["accuracy_long"] = acc_long
+        stats["accuracy_short"] = acc_short
+        stats["accuracy_total"] = acc_total
+        stats["max_drawdown"] = dd[0]
+        stats["max_drawdown_days"] = dd[1]
 
         return stats
 
-    
-def target_optimal(df_price: pd.DataFrame, 
-                   fee_bps: int = 3,
-                   dd_bps: int = 0,
-                   decimal_pip: int = 5) -> pd.DataFrame:
+
+def target_optimal(
+    df_price: pd.DataFrame,
+    fee_bps: int = 3,
+    dd_bps: int = 0,
+    decimal_pip: int = 5,
+) -> pd.DataFrame:
     """
-    Use dynamic programming (Kadane's Algorithm) to find 
-    the optimal target labels. Each trade is penalized by 
-    fee_bps. Output is mapped into [0,1,2] for short, long, 
+    Use dynamic programming (Kadane's Algorithm) to find
+    the optimal target labels. Each trade is penalized by
+    fee_bps. Output is mapped into [0,1,2] for short, long,
     and close (S,L,C) respectively. The drawdown constraint
     prevents any trade from having a drawdown larger than
     the given dd_bps. Prices are converted to bps to allow
     for additive calculations.
-    
+
     Args:
         df_price: Dataframe of input prices.
         fee_bps: Cost of trade entry and exit, which includes
@@ -289,65 +351,77 @@ def target_optimal(df_price: pd.DataFrame,
         decimal_pip: The decimal place representing 1/10 pip,
             which is used for scaling the price changes.
             e.g. EURUSD is 5 where 0.00001 is 1/10 pip.
-    
+
     Returns:
         Series containing optimal trades mapped into [0,1,2]
     """
-    opt = df_price.copy() # output series
-    opt.name = f"dd_{dd_bps}" 
-    opt[:] = 0 # initialize all to zero
+    opt = df_price.copy()  # output series
+    opt.name = f"dd_{dd_bps}"
+    opt[:] = 0  # initialize all to zero
     n = len(df_price)
-    
+
     if n <= 1:
         raise ValueError("df_price requires more than 1 observation.")
-    
+
     idx_buy = 0
     idx_max = 0
-    buy_price = (df_price[0] / (10**-(decimal_pip-1))) + fee_bps 
-    max_price = buy_price # for calculating trade max drawdown
-    
-    for i in range(1,n): # calculate optimal long trades
-        if buy_price >= ((df_price[i] / (10**-(decimal_pip-1))) + fee_bps): # relaxed constraint
-            idx_buy = i # reset trade open
-            idx_max = i # reset max price
-            buy_price = (df_price[i] / (10**-(decimal_pip-1))) + fee_bps
+    buy_price = (df_price[0] / (10 ** -(decimal_pip - 1))) + fee_bps
+    max_price = buy_price  # for calculating trade max drawdown
+
+    for i in range(1, n):  # calculate optimal long trades
+        if buy_price >= (
+            (df_price[i] / (10 ** -(decimal_pip - 1))) + fee_bps
+        ):  # relaxed constraint
+            idx_buy = i  # reset trade open
+            idx_max = i  # reset max price
+            buy_price = (df_price[i] / (10 ** -(decimal_pip - 1))) + fee_bps
             max_price = buy_price
-        elif max_price < (df_price[i] / (10**-(decimal_pip-1))):
-            idx_max = i # reset max price
-            max_price = (df_price[i] / (10**-(decimal_pip-1))) # higher max_price
-        elif max_price - ((df_price[i] / (10**-(decimal_pip-1)))) > dd_bps: # max drawdown constraint
+        elif max_price < (df_price[i] / (10 ** -(decimal_pip - 1))):
+            idx_max = i  # reset max price
+            max_price = df_price[i] / (
+                10 ** -(decimal_pip - 1)
+            )  # higher max_price
+        elif (
+            max_price - ((df_price[i] / (10 ** -(decimal_pip - 1)))) > dd_bps
+        ):  # max drawdown constraint
             if idx_buy != idx_max:
-                opt[idx_buy:(idx_max+1)] = 1 # close long trade
-                
-            idx_buy = i # reset trade open
-            idx_max = i # reset max price
-            buy_price = (df_price[i] / (10**-(decimal_pip-1))) + fee_bps
+                opt[idx_buy : (idx_max + 1)] = 1  # close long trade
+
+            idx_buy = i  # reset trade open
+            idx_max = i  # reset max price
+            buy_price = (df_price[i] / (10 ** -(decimal_pip - 1))) + fee_bps
             max_price = buy_price
-    
+
     idx_sell = 0
     idx_min = 0
-    sell_price = (df_price[0] / (10**-(decimal_pip-1))) - fee_bps 
-    min_price = sell_price 
-    
-    for i in range(1,n): # calculate optimal short trades
-        if sell_price <= ((df_price[i] / (10**-(decimal_pip-1))) - fee_bps): # relaxed constraint
-            idx_sell = i # reset trade open
-            idx_min = i # reset min price
-            sell_price = (df_price[i] / (10**-(decimal_pip-1))) - fee_bps
+    sell_price = (df_price[0] / (10 ** -(decimal_pip - 1))) - fee_bps
+    min_price = sell_price
+
+    for i in range(1, n):  # calculate optimal short trades
+        if sell_price <= (
+            (df_price[i] / (10 ** -(decimal_pip - 1))) - fee_bps
+        ):  # relaxed constraint
+            idx_sell = i  # reset trade open
+            idx_min = i  # reset min price
+            sell_price = (df_price[i] / (10 ** -(decimal_pip - 1))) - fee_bps
             min_price = sell_price
-        elif min_price > (df_price[i] / (10**-(decimal_pip-1))):
-            idx_min = i # reset min price
-            min_price = (df_price[i] / (10**-(decimal_pip-1))) # lower min_price
-        elif min_price - ((df_price[i] / (10**-(decimal_pip-1)))) < -dd_bps: # max drawdown constraint
+        elif min_price > (df_price[i] / (10 ** -(decimal_pip - 1))):
+            idx_min = i  # reset min price
+            min_price = df_price[i] / (
+                10 ** -(decimal_pip - 1)
+            )  # lower min_price
+        elif (
+            min_price - ((df_price[i] / (10 ** -(decimal_pip - 1)))) < -dd_bps
+        ):  # max drawdown constraint
             if idx_sell != idx_min:
-                opt[idx_sell:(idx_min+1)] = -1 # close short trade
-            
-            idx_sell = i # reset trade open
-            idx_min = i # reset min price
-            sell_price = (df_price[i] / (10**-(decimal_pip-1))) - fee_bps
+                opt[idx_sell : (idx_min + 1)] = -1  # close short trade
+
+            idx_sell = i  # reset trade open
+            idx_min = i  # reset min price
+            sell_price = (df_price[i] / (10 ** -(decimal_pip - 1))) - fee_bps
             min_price = sell_price
-    
-    opt.loc[opt == 0] = 2 # close positions
-    opt.loc[opt < 0] = 0 # short positions
-    
+
+    opt.loc[opt == 0] = 2  # close positions
+    opt.loc[opt < 0] = 0  # short positions
+
     return opt
