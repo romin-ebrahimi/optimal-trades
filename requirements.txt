@@ -1,5 +1,3 @@
-awswrangler
-boto3
 environment-kernels
 fastparquet
 jupyter
