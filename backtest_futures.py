@@ -6,14 +6,14 @@ class BackTest:
     def __init__(
         self,
         data: pd.DataFrame,
-        decimal_pip: int = 5,
+        min_increment: float = 0.01,
         threshold: float = 0.5,
-        fee_bps: int = 0,
+        fee: float = 0.0,
     ):
         self._data = data
-        self._decimal_pip = decimal_pip
+        self._min_increment = min_increment
         self._threshold = threshold
-        self._fee_bps = fee_bps
+        self._fee = fee
         self._len = len(data)
 
     def back_test(self) -> pd.DataFrame:
@@ -21,11 +21,13 @@ class BackTest:
         Args:
          data: A dataframe with timestamp, price, probability long,
              probability short, and target signal column.
-         decimal_pip: The decimal place representing 1/10 pip,
-             which is used for scaling the price changes.
-             e.g. EURUSD is 5 where 0.00001 is 1/10 pip.
+         min_increment: The minimum discrete change allowed for the
+             given futures contract.
+             e.g. CL - WTI Crude is 0.01 nominally.
          threshold: The probability threshold for trade entry.
-         fee_bps: expected trading frictions per trade.
+         fee: Expected trading friction per trade. This must be in
+             terms of min_increment or an error will be raised.
+             e.g. for CL, the fee must be a multiple of 0.01.
 
         Returns:
             A pandas dataframe of the simulated trading
@@ -56,13 +58,12 @@ class BackTest:
             self._data.time.isin(ee[ee.open_close == _os].time)
         ].index.values.astype("int")
 
-        df_out.loc[idx_open_l, "trade_delta"] -= self._fee_bps * (
-            10 ** -(self._decimal_pip - 1)
+        df_out.loc[idx_open_l, "trade_delta"] -= self._fee
+        df_out.loc[idx_open_s, "trade_delta"] -= self._fee
+        # Make sure trade deltas do not go beyond the minimum increment.
+        df_out["trade_delta"] = round(
+            df_out.trade_delta, len(str(self._min_increment)) - 2
         )
-        df_out.loc[idx_open_s, "trade_delta"] -= self._fee_bps * (
-            10 ** -(self._decimal_pip - 1)
-        )
-        df_out["trade_delta"] = round(df_out.trade_delta, self._decimal_pip)
 
         return df_out
 
@@ -172,19 +173,24 @@ class BackTest:
             ].index.values.astype("int")
 
         for i in range(len(idx_open)):
+            start_price = self._data.at[idx_open[i], "close"]
             diff_series = (
                 self._data[idx_open[i] : (idx_close[i] + 1)]
                 .close.diff()
                 .shift(-1)
             )
             diff_series = (
-                round(diff_series * direction, self._decimal_pip)
+                round(
+                    diff_series * direction,
+                    len(str(self._minimum_increment)) - 2,
+                )
                 .dropna()
                 .reset_index(drop=True)
             )
-            # Scale changes into basis points.
-            diff_series /= 10 ** -(self._decimal_pip - 1)
-            diff_series[0] -= self._fee_bps
+            # Scale changes using the starting price of the trade,
+            # which makes these additive.
+            diff_series[0] -= self._fee
+            diff_series /= start_price
             rets.append(diff_series.tolist())
 
         return rets
@@ -232,8 +238,7 @@ class BackTest:
 
         Args:
             self: Contains the BackTest class parameters.
-            annual_trade_days: FX market hours Sun 5p - Fri 5p ET,
-                which translates to 260 trading days.
+            annual_trade_days: Futures market hours Sun 5p - Fri 5p CT.
 
         Returns:
           A dictionary containing:

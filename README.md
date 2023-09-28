@@ -58,7 +58,9 @@ joint model and target label solution $F^{\ast}(Y^{\ast},X)$.
 
 ### Code
 - **createEnv.sh** - bash script for creating virtual python environment.
-- **backtest.py** - class and methods used for trade label optimization and testing.
+- **backtest.py** - class and methods used for FX trade label optimization and testing.
+- **backtest_futures.py** - class and methods for trade label optimization and testing
+of futures contracts.
 - **main.ipynb** - python notebook demonstrating usage and methodology.
 
 Within the `backtest.py` module, the method `target_optimal` contains the 
