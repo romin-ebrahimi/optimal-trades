@@ -219,10 +219,10 @@ class BackTest:
         drawdown percentage and the duration of the worst
         drawdown in days.
         """
-        # Cumulative sum of returns.
-        c_sum = list(df_bt.trade_delta.cumsum())
-        # Running maximum of cumulative sum of returns.
-        c_max = list(df_bt.trade_delta.cumsum().cummax())
+        # Cumulative sum of log returns.
+        c_sum = list(df_bt.log_returns.cumsum())
+        # Running maximum of cumulative sum of log returns.
+        c_max = list(df_bt.log_returns.cumsum().cummax())
         # List of drawdowns over time.
         dds = [None] * len(c_sum)
         # Iterate and calculate drawdowns over time.
@@ -319,8 +319,8 @@ class BackTest:
         stats["trade_count_long"] = trades_l
         stats["trade_count_short"] = trades_s
         stats["trade_count_total"] = trades_total
-        stats["average_return_long"] = avg_l
-        stats["average_return_short"] = avg_s
+        stats["average_return_long"] = round(avg_l, 4)
+        stats["average_return_short"] = round(avg_s, 4)
         stats["accuracy_long"] = acc_long
         stats["accuracy_short"] = acc_short
         stats["accuracy_total"] = acc_total
@@ -387,7 +387,7 @@ def target_optimal(
         elif max_price < df_price[i]:
             idx_max = i  # Reset max price index and the max_price.
             max_price = df_price[i]
-        elif (max_price - df_price[i]) / start_price > dd_bps:
+        elif (max_price - df_price[i]) / start_price > 1 / dd_bps:
             # If max drawdown constraint, then close long trade.
             if idx_buy != idx_max:
                 opt[idx_buy : (idx_max + 1)] = 1
@@ -416,7 +416,7 @@ def target_optimal(
         elif min_price > df_price[i]:
             idx_min = i  # Reset min price index and the min_price.
             min_price = df_price[i]
-        elif (min_price - df_price[i]) / start_price < -dd_bps:
+        elif (min_price - df_price[i]) / start_price < -1 / dd_bps:
             # If max drawdown constraint, then close the short trade.
             if idx_sell != idx_min:
                 opt[idx_sell : (idx_min + 1)] = -1
