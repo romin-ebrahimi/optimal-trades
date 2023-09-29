@@ -7,8 +7,8 @@ class BackTest:
         self,
         data: pd.DataFrame,
         min_increment: float = 0.01,
-        threshold: float = 0.5,
         fee: float = 0.0,
+        threshold: float = 0.5,
     ):
         self._data = data
         self._min_increment = min_increment
@@ -24,21 +24,24 @@ class BackTest:
          min_increment: The minimum discrete change allowed for the
              given futures contract.
              e.g. CL - WTI Crude is 0.01 nominally.
-         threshold: The probability threshold for trade entry.
          fee: Expected trading friction per trade. This must be in
              terms of min_increment or an error will be raised.
              e.g. for CL, the fee must be a multiple of 0.01.
+         threshold: The probability threshold for trade entry.
 
         Returns:
             A pandas dataframe of the simulated trading
             entry/exit points and the expected trading returns
             over time.
         """
+        if self._fee % self._min_increment != 0:
+            raise ValueError("fee must be a multiple of min_increment.")
+
         _ol = "open long"
         _os = "open short"
         # Columns are: time, close price, signal, trade delta.
         df_out = self._data[["time", "close"]].copy()
-        # Column signal (S,L,C) maps to (-1, 1, 0).
+        # Column signal (S, L, C) maps to (-1, 1, 0).
         df_out["signal"] = 0
         df_out.loc[self._data.L > self._threshold, "signal"] = 1
         df_out.loc[self._data.S > self._threshold, "signal"] = -1
@@ -46,6 +49,10 @@ class BackTest:
         df_out.at[df_out.index[-1], "signal"] = 0
         df_out["trade_delta"] = (
             self._data["close"].diff().shift(-1) * df_out["signal"]
+        )
+        # Log returns are additive and an approximation of nominal returns.
+        df_out["log_returns"] = (
+            np.log(self._data["close"]).diff().shift(-1) * df_out["signal"]
         )
         df_out = df_out.fillna(0)
 
@@ -60,10 +67,15 @@ class BackTest:
 
         df_out.loc[idx_open_l, "trade_delta"] -= self._fee
         df_out.loc[idx_open_s, "trade_delta"] -= self._fee
-        # Make sure trade deltas do not go beyond the minimum increment.
+        # Make sure trade deltas do not go above the minimum increment.
         df_out["trade_delta"] = round(
             df_out.trade_delta, len(str(self._min_increment)) - 2
         )
+
+        idx_full = np.concatenate([idx_open_l, idx_open_s])
+        fee_bps = np.mean(self._fee / df_out.loc[idx_full, "close"])
+        df_out.loc[idx_open_l, "log_returns"] -= fee_bps
+        df_out.loc[idx_open_s, "log_returns"] -= fee_bps
 
         return df_out
 
@@ -145,7 +157,7 @@ class BackTest:
         return df_out
 
     def _get_returns(self, is_long=True) -> list[list]:
-        "Given trades, calculate the return series in bps."
+        "Given a list of trades, calculate the log return series."
         rets = []
         ee = self.entry_exit()
         _ol = "open long"
@@ -172,26 +184,20 @@ class BackTest:
                 self._data.time.isin(ee[ee.open_close == _cs].time)
             ].index.values.astype("int")
 
+        # Calculate log returns to approximate nominal returns.
         for i in range(len(idx_open)):
             start_price = self._data.at[idx_open[i], "close"]
-            diff_series = (
-                self._data[idx_open[i] : (idx_close[i] + 1)]
-                .close.diff()
+            log_returns = (
+                np.log(self._data[idx_open[i] : (idx_close[i] + 1)].close)
+                .diff()
                 .shift(-1)
             )
-            diff_series = (
-                round(
-                    diff_series * direction,
-                    len(str(self._minimum_increment)) - 2,
-                )
-                .dropna()
-                .reset_index(drop=True)
+            log_returns = (
+                (log_returns * direction).dropna().reset_index(drop=True)
             )
-            # Scale changes using the starting price of the trade,
-            # which makes these additive.
-            diff_series[0] -= self._fee
-            diff_series /= start_price
-            rets.append(diff_series.tolist())
+            # Subtract fee in basis points from period 0 of the trade series.
+            log_returns[0] -= self._fee / start_price
+            rets.append(log_returns.tolist())
 
         return rets
 
@@ -228,7 +234,10 @@ class BackTest:
         idx_1 = dds.index(dd_max)  # End index of max drawdown.
         idx_0 = c_max.index(c_max[idx_1])  # Start index of max drawdown.
 
-        n_days = (df_bt.at[idx_1, "time"] - df_bt.at[idx_0, "time"]).days
+        n_days = (
+            pd.to_datetime(df_bt.at[idx_1, "time"])
+            - pd.to_datetime(df_bt.at[idx_0, "time"])
+        ).days
 
         return (round(dd_max, 3), n_days)
 
@@ -264,14 +273,15 @@ class BackTest:
         trades_l = len(rets_l)
         trades_s = len(rets_s)
         trades_total = trades_s + trades_l
-        total_return = bt.trade_delta.sum()
+        total_return = bt.log_returns.sum()
         n_days = (
-            self._data.at[(self._len - 1), "time"] - self._data.at[0, "time"]
+            pd.to_datetime(self._data.at[(self._len - 1), "time"])
+            - pd.to_datetime(self._data.at[0, "time"])
         ).days
         annual_return = total_return * (annual_trade_days / n_days)
         std_scaler = (annual_trade_days * (len(bt) / n_days)) ** 0.5
-        annual_sdev = np.std(bt.trade_delta) * std_scaler
-        downside_delta = bt.trade_delta.copy()
+        annual_sdev = np.std(bt.log_returns) * std_scaler
+        downside_delta = bt.log_returns.copy()
         downside_delta[downside_delta > 0] = 0
         annual_downside_sdev = np.std(downside_delta) * std_scaler
 
@@ -286,18 +296,12 @@ class BackTest:
             sortino = np.nan
 
         if trades_l > 0:
-            # Rounding is done to ensure 1 bps discrete minimum.
-            # This ignores fractional bps as noise.
-            avg_l = round(
-                sum([sum(ret) for ret in rets_l]) / float(trades_l), 0
-            )
+            avg_l = sum([sum(ret) for ret in rets_l]) / float(trades_l)
         else:
             avg_l = np.nan
 
         if trades_s > 0:
-            avg_s = round(
-                sum([sum(ret) for ret in rets_s]) / float(trades_s), 0
-            )
+            avg_s = sum([sum(ret) for ret in rets_s]) / float(trades_s)
         else:
             avg_s = np.nan
 
@@ -328,9 +332,9 @@ class BackTest:
 
 def target_optimal(
     df_price: pd.DataFrame,
-    fee_bps: int = 3,
+    min_increment: float = 0.01,
+    fee: float = 0.0,
     dd_bps: int = 0,
-    decimal_pip: int = 5,
 ) -> pd.DataFrame:
     """
     Use dynamic programming (Kadane's Algorithm) to find
@@ -343,12 +347,13 @@ def target_optimal(
 
     Args:
         df_price: Dataframe of input prices.
-        fee_bps: Cost of trade entry and exit, which includes
-            the expected slippage.
+        min_increment: The minimum discrete change allowed for the
+             given futures contract.
+             e.g. CL - WTI Crude is 0.01 nominally.
+        fee: Expected trading friction per trade. This must be in
+             terms of min_increment or an error will be raised.
+             e.g. for CL, the fee must be a multiple of 0.01.
         dd_bps: Maximum allowable trade drawdown in bps.
-        decimal_pip: The decimal place representing 1/10 pip,
-            which is used for scaling the price changes.
-            e.g. EURUSD is 5 where 0.00001 is 1/10 pip.
 
     Returns:
         Series containing optimal trades mapped into [0,1,2]
@@ -361,64 +366,68 @@ def target_optimal(
 
     if n <= 1:
         raise ValueError("df_price requires more than 1 observation.")
+    elif fee % min_increment != 0:
+        raise ValueError("fee must be a multiple of min_increment.")
 
     idx_buy = 0
     idx_max = 0
-    buy_price = (df_price[0] / (10 ** -(decimal_pip - 1))) + fee_bps
+    start_price = df_price[0]  # This is for approximating trade return.
+    buy_price = start_price + fee
     max_price = buy_price  # Used to calculate trade max drawdown.
 
     # Calculate optimal long trades.
     for i in range(1, n):
-        if buy_price >= (
-            (df_price[i] / (10 ** -(decimal_pip - 1))) + fee_bps
-        ):  # relaxed constraint
-            idx_buy = i  # reset trade open
-            idx_max = i  # reset max price
-            buy_price = (df_price[i] / (10 ** -(decimal_pip - 1))) + fee_bps
+        # Relaxed constraint.
+        if buy_price >= df_price[i] + fee:
+            idx_buy = i  # Reset indices of trade open and max price.
+            idx_max = i
+            start_price = df_price[i]  # Reset all prices.
+            buy_price = start_price + fee
             max_price = buy_price
-        elif max_price < (df_price[i] / (10 ** -(decimal_pip - 1))):
-            idx_max = i  # Reset max price index and max_price.
-            max_price = df_price[i] / (10 ** -(decimal_pip - 1))
-        elif (
-            max_price - (df_price[i] / (10 ** -(decimal_pip - 1))) > dd_bps
-        ):  # max drawdown constraint
+        elif max_price < df_price[i]:
+            idx_max = i  # Reset max price index and the max_price.
+            max_price = df_price[i]
+        elif (max_price - df_price[i]) / start_price > dd_bps:
+            # If max drawdown constraint, then close long trade.
             if idx_buy != idx_max:
-                opt[idx_buy : (idx_max + 1)] = 1  # close long trade
+                opt[idx_buy : (idx_max + 1)] = 1
 
-            idx_buy = i  # reset trade open
-            idx_max = i  # reset max price
-            buy_price = (df_price[i] / (10 ** -(decimal_pip - 1))) + fee_bps
+            idx_buy = i  # Reset indices of trade open and max price.
+            idx_max = i
+            start_price = df_price[i]  # Reset all prices.
+            buy_price = start_price + fee
             max_price = buy_price
 
     idx_sell = 0
     idx_min = 0
-    sell_price = (df_price[0] / (10 ** -(decimal_pip - 1))) - fee_bps
+    start_price = df_price[0]  # This is for approximating trade return.
+    sell_price = start_price - fee
     min_price = sell_price
 
     # Calculate optimal short trades.
     for i in range(1, n):
-        if sell_price <= (
-            (df_price[i] / (10 ** -(decimal_pip - 1))) - fee_bps
-        ):  # relaxed constraint
-            idx_sell = i  # reset trade open
-            idx_min = i  # reset min price
-            sell_price = (df_price[i] / (10 ** -(decimal_pip - 1))) - fee_bps
+        # Relaxed constraint.
+        if sell_price <= df_price[i] - fee:
+            idx_sell = i  # Reset indices of trade open and min price.
+            idx_min = i
+            start_price = df_price[i]  # Reset all prices.
+            sell_price = start_price - fee
             min_price = sell_price
-        elif min_price > (df_price[i] / (10 ** -(decimal_pip - 1))):
-            idx_min = i  # Reset the min price index and min_price.
-            min_price = df_price[i] / (10 ** -(decimal_pip - 1))
-        elif (
-            min_price - (df_price[i] / (10 ** -(decimal_pip - 1))) < -dd_bps
-        ):  # max drawdown constraint
+        elif min_price > df_price[i]:
+            idx_min = i  # Reset min price index and the min_price.
+            min_price = df_price[i]
+        elif (min_price - df_price[i]) / start_price < -dd_bps:
+            # If max drawdown constraint, then close the short trade.
             if idx_sell != idx_min:
-                opt[idx_sell : (idx_min + 1)] = -1  # close short trade
+                opt[idx_sell : (idx_min + 1)] = -1
 
-            idx_sell = i  # reset trade open
-            idx_min = i  # reset min price
-            sell_price = (df_price[i] / (10 ** -(decimal_pip - 1))) - fee_bps
+            idx_sell = i  # Reset indices of trade open and min price.
+            idx_min = i
+            start_price = df_price[i]  # Reset all prices.
+            sell_price = start_price - fee
             min_price = sell_price
 
-    opt.loc[opt == 0] = 2  # close positions
-    opt.loc[opt < 0] = 0  # short positions
+    opt.loc[opt == 0] = 2  # Closed positions.
+    opt.loc[opt < 0] = 0  # Short positions.
 
     return opt

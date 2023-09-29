@@ -36,7 +36,7 @@ class BackTest:
         _os = "open short"
         # Columns are: time, close price, signal, trade delta.
         df_out = self._data[["time", "close"]].copy()
-        # Column signal (S,L,C) maps to (-1, 1, 0).
+        # Column signal (S, L, C) maps to (-1, 1, 0).
         df_out["signal"] = 0
         df_out.loc[self._data.L > self._threshold, "signal"] = 1
         df_out.loc[self._data.S > self._threshold, "signal"] = -1
@@ -144,7 +144,7 @@ class BackTest:
         return df_out
 
     def _get_returns(self, is_long=True) -> list[list]:
-        "Given trades, calculate the return series in bps."
+        "Given a list of trades, calculate the return series in bps."
         rets = []
         ee = self.entry_exit()
         _ol = "open long"
@@ -222,7 +222,10 @@ class BackTest:
         idx_1 = dds.index(dd_max)  # End index of max drawdown.
         idx_0 = c_max.index(c_max[idx_1])  # Start index of max drawdown.
 
-        n_days = (df_bt.at[idx_1, "time"] - df_bt.at[idx_0, "time"]).days
+        n_days = (
+            pd.to_datetime(df_bt.at[idx_1, "time"])
+            - pd.to_datetime(df_bt.at[idx_0, "time"])
+        ).days
 
         return (round(dd_max, 3), n_days)
 
@@ -261,7 +264,8 @@ class BackTest:
         trades_total = trades_s + trades_l
         total_return = bt.trade_delta.sum()
         n_days = (
-            self._data.at[(self._len - 1), "time"] - self._data.at[0, "time"]
+            pd.to_datetime(self._data.at[(self._len - 1), "time"])
+            - pd.to_datetime(self._data.at[0, "time"])
         ).days
         annual_return = total_return * (annual_trade_days / n_days)
         std_scaler = (annual_trade_days * (len(bt) / n_days)) ** 0.5
@@ -364,24 +368,22 @@ def target_optimal(
 
     # Calculate optimal long trades.
     for i in range(1, n):
-        if buy_price >= (
-            (df_price[i] / (10 ** -(decimal_pip - 1))) + fee_bps
-        ):  # relaxed constraint
-            idx_buy = i  # reset trade open
-            idx_max = i  # reset max price
+        # Relaxed constraint.
+        if buy_price >= ((df_price[i] / (10 ** -(decimal_pip - 1))) + fee_bps):
+            idx_buy = i  # Reset indices of trade open and max price.
+            idx_max = i
             buy_price = (df_price[i] / (10 ** -(decimal_pip - 1))) + fee_bps
             max_price = buy_price
         elif max_price < (df_price[i] / (10 ** -(decimal_pip - 1))):
             idx_max = i  # Reset max price index and max_price.
             max_price = df_price[i] / (10 ** -(decimal_pip - 1))
-        elif (
-            max_price - (df_price[i] / (10 ** -(decimal_pip - 1))) > dd_bps
-        ):  # max drawdown constraint
+        elif max_price - (df_price[i] / (10 ** -(decimal_pip - 1))) > dd_bps:
+            # If max drawdown constraint, then close long trade.
             if idx_buy != idx_max:
-                opt[idx_buy : (idx_max + 1)] = 1  # close long trade
+                opt[idx_buy : (idx_max + 1)] = 1
 
-            idx_buy = i  # reset trade open
-            idx_max = i  # reset max price
+            idx_buy = i  # Reset indices of trade open and max price.
+            idx_max = i
             buy_price = (df_price[i] / (10 ** -(decimal_pip - 1))) + fee_bps
             max_price = buy_price
 
@@ -392,28 +394,26 @@ def target_optimal(
 
     # Calculate optimal short trades.
     for i in range(1, n):
-        if sell_price <= (
-            (df_price[i] / (10 ** -(decimal_pip - 1))) - fee_bps
-        ):  # relaxed constraint
-            idx_sell = i  # reset trade open
-            idx_min = i  # reset min price
+        # Relaxed constraint.
+        if sell_price <= ((df_price[i] / (10 ** -(decimal_pip - 1))) - fee_bps):
+            idx_sell = i  # Reset indices of trade open and min price.
+            idx_min = i
             sell_price = (df_price[i] / (10 ** -(decimal_pip - 1))) - fee_bps
             min_price = sell_price
         elif min_price > (df_price[i] / (10 ** -(decimal_pip - 1))):
             idx_min = i  # Reset the min price index and min_price.
             min_price = df_price[i] / (10 ** -(decimal_pip - 1))
-        elif (
-            min_price - (df_price[i] / (10 ** -(decimal_pip - 1))) < -dd_bps
-        ):  # max drawdown constraint
+        elif min_price - (df_price[i] / (10 ** -(decimal_pip - 1))) < -dd_bps:
+            # If max drawdown constraint, then close short trade.
             if idx_sell != idx_min:
-                opt[idx_sell : (idx_min + 1)] = -1  # close short trade
+                opt[idx_sell : (idx_min + 1)] = -1
 
-            idx_sell = i  # reset trade open
-            idx_min = i  # reset min price
+            idx_sell = i  # Reset indices of trade open and min price.
+            idx_min = i
             sell_price = (df_price[i] / (10 ** -(decimal_pip - 1))) - fee_bps
             min_price = sell_price
 
-    opt.loc[opt == 0] = 2  # close positions
-    opt.loc[opt < 0] = 0  # short positions
+    opt.loc[opt == 0] = 2  # Close positions.
+    opt.loc[opt < 0] = 0  # Short positions.
 
     return opt
