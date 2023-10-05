@@ -19,8 +19,9 @@ class BackTest:
     def back_test(self) -> pd.DataFrame:
         """
         Args:
-         data: A dataframe with timestamp, price, probability long,
-             probability short, and target signal column.
+         data: A dataframe with column names time, close,
+             L, and S mapping to timestamp, price, probability long,
+             and probability short.
          min_increment: The minimum discrete change allowed for the
              given futures contract.
              e.g. CL - WTI Crude is 0.01 nominally.
@@ -41,7 +42,7 @@ class BackTest:
         _os = "open short"
         # Columns are: time, close price, signal, trade delta.
         df_out = self._data[["time", "close"]].copy()
-        # Column signal (S, L, C) maps to (-1, 1, 0).
+        # Column signal [S, L, C] maps to [-1, 1, 0].
         df_out["signal"] = 0
         df_out.loc[self._data.L > self._threshold, "signal"] = 1
         df_out.loc[self._data.S > self._threshold, "signal"] = -1
@@ -340,7 +341,7 @@ def target_optimal(
     Use dynamic programming (Kadane's Algorithm) to find
     the optimal target labels. Each trade is penalized by
     fee_bps. Output is mapped into [0,1,2] for short, long,
-    and close (S,L,C) respectively. The drawdown constraint
+    and close [S,L,C] respectively. The drawdown constraint
     prevents any trade from having a drawdown larger than
     the given dd_bps. Prices are converted to bps to allow
     for additive calculations.

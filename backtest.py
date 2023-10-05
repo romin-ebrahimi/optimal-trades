@@ -19,8 +19,9 @@ class BackTest:
     def back_test(self) -> pd.DataFrame:
         """
         Args:
-         data: A dataframe with timestamp, price, probability long,
-             probability short, and target signal column.
+         data: A dataframe with column names time, close,
+             L, and S mapping to timestamp, price, probability long,
+             and probability short.
          decimal_pip: The decimal place representing 1/10 pip,
              which is used for scaling the price changes.
              e.g. EURUSD is 5 where 0.00001 is 1/10 pip.
@@ -335,7 +336,7 @@ def target_optimal(
     Use dynamic programming (Kadane's Algorithm) to find
     the optimal target labels. Each trade is penalized by
     fee_bps. Output is mapped into [0,1,2] for short, long,
-    and close (S,L,C) respectively. The drawdown constraint
+    and close [S,L,C] respectively. The drawdown constraint
     prevents any trade from having a drawdown larger than
     the given dd_bps. Prices are converted to bps to allow
     for additive calculations.
