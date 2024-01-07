@@ -2,21 +2,21 @@
 
 ### Background
 Much of the literature for systematic trading focuses on testing different 
-models that are used for financial price forecasting. What's wrong with 
-forecasting financial time series?
+financial price forecasting models. What's wrong with forecasting financial 
+time series?
 
 1. Price forecasting doesn't align well with the objective of a trader. As a trader, 
 I'm less interested in whether the price over the next `n` periods is going up, down, 
-or sideways. What I'm truly interested in at any point, is whether I should 
-be long, short, or close out any open positions.
+or sideways. What I'm truly interested in at any given point in time, is whether I
+should go long, short, or close out open positions.
 
-2. Financial time series are highly random. A nonexhaustive list of issues
+3. Financial time series are highly random. A nonexhaustive list of issues
 associated with price forecasting financial series includes:
 
 **Issues:**
 * Leptokurtic characteristic of price changes.
 * Apparent nonstationarity or unstable sample variances across periods.
-* Discontinuities in prices e.g. jump discontinuities at market open or close
+* Discontinuities in prices e.g. jump discontinuities at market open or close.
     
 **Solutions:**
 * Fractional price changes. Price changes are random while fractional price
@@ -42,9 +42,9 @@ mapping to the three trading positions of "short", "long", and "closed". The lab
 $Y$, representing these three states, can be generated from fixed duration returns, 
 which have no guarantee of optimality, or directly optimizing the labels as part 
 of the modeling process. Optimizing the model and target labels while conditioning 
-on the inputs can be done using an algorithm that accounts for trade frictions and 
-"risk". Where trade frictions account for both expected transaction costs and 
-slippage.
+on the inputs can be done using a variant of Kadane's algorithm that accounts for 
+trade frictions and "risk". Trade frictions should account for both expected 
+transaction costs and slippage.
 
 Given some risk constraint $r_k$ and the expected trade frictions, the algorithm 
 maximizes returns. In this context, "risk" can be a measure of dispersion or 
@@ -67,4 +67,10 @@ Within the `backtest.py` module, the method `target_optimal` contains the
 algorithm for optimizing trade labels. This can be used to generate different
 potential solutions given some input target constraints. Then, the optimal model 
 can be found using time series cross validation.
+
+### Setup Git Hooks
+1. Within the project repo, run `pre-commit install`.
+2. Then run `pre-commit autoupdate`.
+3. To run pre-commit git hooks for flake8 and black run use 
+`pre-commit run --all-files`.
 
