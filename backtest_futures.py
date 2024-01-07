@@ -44,8 +44,17 @@ class BackTest:
         df_out = self._data[["time", "close"]].copy()
         # Column signal [S, L, C] maps to [-1, 1, 0].
         df_out["signal"] = 0
-        df_out.loc[self._data.L > self._threshold, "signal"] = 1
-        df_out.loc[self._data.S > self._threshold, "signal"] = -1
+
+        # Conditions for not long and not short are useful for the 3 class
+        # example where there is a risk of both L and S being > threshold.
+        condition_long = self._data.L > self._threshold
+        condition_not_short = self._data.S < 1 - self._threshold
+        condition_short = self._data.S > self._threshold
+        condition_not_long = self._data.L < 1 - self._threshold
+
+        df_out.loc[condition_long & condition_not_short, "signal"] = 1
+        df_out.loc[condition_short & condition_not_long, "signal"] = -1
+
         # Force close positions at the end of the sample.
         df_out.at[df_out.index[-1], "signal"] = 0
         df_out["trade_delta"] = (
@@ -116,7 +125,9 @@ class BackTest:
                 state = _close
 
             if (
-                self._data.at[i, "L"] > self._threshold and state == _close
+                self._data.at[i, "L"] > self._threshold
+                and self._data.at[i, "S"] < 1 - self._threshold
+                and state == _close
             ):  # Open long position.
                 temp = pd.DataFrame(
                     self._data.loc[i, ["time", "close"]].copy()
@@ -126,7 +137,9 @@ class BackTest:
                 df_out = pd.concat([df_out, temp])
                 state = _open_long
             elif (
-                self._data.at[i, "S"] > self._threshold and state == _close
+                self._data.at[i, "S"] > self._threshold
+                and self._data.at[i, "L"] < 1 - self._threshold
+                and state == _close
             ):  # Open short position.
                 temp = pd.DataFrame(
                     self._data.loc[i, ["time", "close"]].copy()
