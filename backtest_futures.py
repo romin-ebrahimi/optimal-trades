@@ -401,7 +401,7 @@ def target_optimal(
         elif max_price < df_price[i]:
             idx_max = i  # Reset max price index and the max_price.
             max_price = df_price[i]
-        elif (max_price - df_price[i]) / start_price > 1 / dd_bps:
+        elif (max_price - df_price[i]) / max_price > dd_bps / 1e4:
             # If max drawdown constraint, then close long trade.
             if idx_buy != idx_max:
                 opt[idx_buy : (idx_max + 1)] = 1
@@ -430,7 +430,7 @@ def target_optimal(
         elif min_price > df_price[i]:
             idx_min = i  # Reset min price index and the min_price.
             min_price = df_price[i]
-        elif (min_price - df_price[i]) / start_price < -1 / dd_bps:
+        elif (min_price - df_price[i]) / min_price < -dd_bps / 1e4:
             # If max drawdown constraint, then close the short trade.
             if idx_sell != idx_min:
                 opt[idx_sell : (idx_min + 1)] = -1
