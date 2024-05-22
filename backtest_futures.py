@@ -19,21 +19,18 @@ class BackTest:
     def back_test(self) -> pd.DataFrame:
         """
         Args:
-         data: A dataframe with column names time, close,
-             L, and S mapping to timestamp, price, probability long,
-             and probability short.
-         min_increment: The minimum discrete change allowed for the
-             given futures contract.
-             e.g. CL - WTI Crude is 0.01 nominally.
-         fee: Expected trading friction per trade. This must be in
-             terms of min_increment or an error will be raised.
-             e.g. for CL, the fee must be a multiple of 0.01.
+         data: A dataframe with column names time, close, L, and S mapping to
+            timestamp, price, probability long, and probability short.
+         min_increment: The minimum discrete change allowed for the given
+            futures contract. e.g. CL - WTI Crude is 0.01 nominally.
+         fee: Expected trading friction per trade. This must be in terms of
+            min_increment or an error will be raised. e.g. for CL, the fee must
+            be a multiple of 0.01.
          threshold: The probability threshold for trade entry.
 
         Returns:
-            A pandas dataframe of the simulated trading
-            entry/exit points and the expected trading returns
-            over time.
+            A pandas dataframe of the simulated trading entry/exit points and
+            the expected trading returns over time.
         """
         if self._fee % self._min_increment != 0:
             raise ValueError("fee must be a multiple of min_increment.")
@@ -229,9 +226,8 @@ class BackTest:
 
     def _get_drawdown(self, df_bt: pd.DataFrame) -> tuple[float, float]:
         """
-        Given full backtest trade deltas, calculate worst
-        drawdown percentage and the duration of the worst
-        drawdown in days.
+        Given full backtest trade deltas, calculate worst drawdown percentage
+        and the duration of the worst drawdown in days.
         """
         # Cumulative sum of log returns.
         c_sum = list(df_bt.log_returns.cumsum())
@@ -351,22 +347,19 @@ def target_optimal(
     dd_bps: int = 0,
 ) -> pd.DataFrame:
     """
-    Use dynamic programming (Kadane's Algorithm) to find
-    the optimal target labels. Each trade is penalized by
-    fee_bps. Output is mapped into [0,1,2] for short, long,
-    and close [S,L,C] respectively. The drawdown constraint
-    prevents any trade from having a drawdown larger than
-    the given dd_bps. Prices are converted to bps to allow
-    for additive calculations.
+    Use dynamic programming (Kadane's Algorithm) to find the optimal target
+    labels. Each trade is penalized by fee_bps. Output is mapped into [0,1,2]
+    for short, long, and close [S,L,C] respectively. The drawdown constraint
+    prevents any trade from having a drawdown larger than the given dd_bps.
+    Prices are converted to bps to allow for additive calculations.
 
     Args:
         df_price: Dataframe of input prices.
-        min_increment: The minimum discrete change allowed for the
-             given futures contract.
-             e.g. CL - WTI Crude is 0.01 nominally.
-        fee: Expected trading friction per trade. This must be in
-             terms of min_increment or an error will be raised.
-             e.g. for CL, the fee must be a multiple of 0.01.
+        min_increment: The minimum discrete change allowed for the given futures
+            contract. e.g. CL - WTI Crude is 0.01 nominally.
+        fee: Expected trading friction per trade. This must be in terms of
+            min_increment or an error will be raised. e.g. for CL, the fee must
+            be a multiple of 0.01.
         dd_bps: Maximum allowable trade drawdown in bps.
 
     Returns:

@@ -19,19 +19,17 @@ class BackTest:
     def back_test(self) -> pd.DataFrame:
         """
         Args:
-         data: A dataframe with column names time, close,
-             L, and S mapping to timestamp, price, probability long,
-             and probability short.
-         decimal_pip: The decimal place representing 1/10 pip,
-             which is used for scaling the price changes.
-             e.g. EURUSD is 5 where 0.00001 is 1/10 pip.
+         data: A dataframe with column names time, close, L, and S mapping to
+            timestamp, price, probability long, and probability short.
+         decimal_pip: The decimal place representing 1/10 pip, which is used for
+            scaling the price changes. e.g. EURUSD is 5 where 0.00001 is 1/10
+            pip.
          threshold: The probability threshold for trade entry.
          fee_bps: expected trading frictions per trade.
 
         Returns:
-            A pandas dataframe of the simulated trading
-            entry/exit points and the expected trading returns
-            over time.
+            A pandas dataframe of the simulated trading entry/exit points and
+            the expected trading returns over time.
         """
         _ol = "open long"
         _os = "open short"
@@ -78,8 +76,8 @@ class BackTest:
 
     def entry_exit(self) -> pd.DataFrame:
         """
-        Given input data, return a dataframe where each row is
-        a trade entry or exit time stamp and position.
+        Given input data, return a dataframe where each row is a trade entry or
+        exit time stamp and position.
         """
         _select_columns = ["time", "close", "trade", "open_close"]
         df_out = pd.DataFrame(columns=_select_columns)
@@ -217,9 +215,8 @@ class BackTest:
 
     def _get_drawdown(self, df_bt: pd.DataFrame) -> tuple[float, float]:
         """
-        Given full backtest trade deltas, calculate worst
-        drawdown percentage and the duration of the worst
-        drawdown in days.
+        Given full backtest trade deltas, calculate worst drawdown percentage
+        and the duration of the worst drawdown in days.
         """
         # Cumulative sum of returns.
         c_sum = list(df_bt.trade_delta.cumsum())
@@ -346,22 +343,20 @@ def target_optimal(
     decimal_pip: int = 5,
 ) -> pd.DataFrame:
     """
-    Use dynamic programming (Kadane's Algorithm) to find
-    the optimal target labels. Each trade is penalized by
-    fee_bps. Output is mapped into [0,1,2] for short, long,
-    and close [S,L,C] respectively. The drawdown constraint
-    prevents any trade from having a drawdown larger than
-    the given dd_bps. Prices are converted to bps to allow
-    for additive calculations.
+    Use dynamic programming (Kadane's Algorithm) to find the optimal target
+    labels. Each trade is penalized by fee_bps. Output is mapped into [0,1,2]
+    for short, long, and close [S,L,C] respectively. The drawdown constraint
+    prevents any trade from having a drawdown larger than the given dd_bps.
+    Prices are converted to bps to allow for additive calculations.
 
     Args:
         df_price: Dataframe of input prices.
-        fee_bps: Cost of trade entry and exit, which includes
-            the expected slippage.
+        fee_bps: Cost of trade entry and exit, which includes the expected
+            slippage.
         dd_bps: Maximum allowable trade drawdown in bps.
-        decimal_pip: The decimal place representing 1/10 pip,
-            which is used for scaling the price changes.
-            e.g. EURUSD is 5 where 0.00001 is 1/10 pip.
+        decimal_pip: The decimal place representing 1/10 pip, which is used for
+            scaling the price changes. e.g. EURUSD is 5 where 0.00001 is 1/10
+            pip.
 
     Returns:
         Series containing optimal trades mapped into [0,1,2]
